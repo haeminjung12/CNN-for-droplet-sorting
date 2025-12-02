@@ -8,7 +8,8 @@ This repository contains a pair of MATLAB scripts: `dropletFindCircle.m` for det
 
 ## Usage
 1. Start MATLAB and add this folder to your path.
-2. Run the script with the directory of your images. If you omit the argument, a folder picker appears.
+2. Run the script with the directory of your images. If you omit the argument, a folder picker appears. You can re-open a
+   folder later to continue labeling; existing `droplet_labels.mat` entries are restored when the bounding boxes match.
 
    ```matlab
    droplet_labeler('path/to/your/images');
@@ -23,6 +24,6 @@ This repository contains a pair of MATLAB scripts: `dropletFindCircle.m` for det
    - `droplet_labels.mat` (MATLAB table for downstream scripts; includes image filename, bounding box, ignore flag, and label)
 
 ### Tweaking detection (dropletFindCircle)
-`droplet_labeler` calls `dropletFindCircle`, which searches for `.tif/.tiff` files in the folder, enhances contrast, and runs two imfindcircles passes (small and large radii). Edit the parameter block at the top of `dropletFindCircle.m` to retune radius bands, sensitivity, and suppression thresholds for your images.
+`droplet_labeler` calls `dropletFindCircle`, which searches for `.tif/.tiff` files in the folder, enhances contrast, and runs two imfindcircles passes (small and large radii). Edit the parameter block at the top of `dropletFindCircle.m` to retune radius bands, sensitivity, and suppression thresholds for your images. Pass a second argument (`true`) to display per-image detection overlays when you want to visually inspect the circles.
 
 `dropletFindCircle` saves the detections to `circlesResults.mat` in your image folder so you can reuse or inspect them between sessions. Launching `droplet_labeler` will reuse that file when present.

@@ -1,10 +1,13 @@
-function circlesResults = dropletFindCircle(folder)
+function circlesResults = dropletFindCircle(folder, showFigures)
 % dropletFindCircle Detect droplets using tuned multi-scale circle search.
 %   circlesResults = dropletFindCircle(folder) scans the specified FOLDER
 %   for .tif/.tiff images, runs imfindcircles at two radius bands, applies
 %   non-maximum suppression, and returns a struct array with fields:
 %   filename, centers, radii, and metric. Results are also saved to
 %   circlesResults.mat in the same folder.
+%
+%   circlesResults = dropletFindCircle(folder, true) also opens a figure per
+%   image to visualize the detected circles (useful for tuning).
 %
 %   This implementation follows the provided detectEachDroplet routine with
 %   small/large radius passes, contrast enhancement, and overlap filtering.
@@ -13,6 +16,9 @@ function circlesResults = dropletFindCircle(folder)
 
     if nargin < 1 || isempty(folder)
         folder = pwd;
+    end
+    if nargin < 2 || isempty(showFigures)
+        showFigures = false;
     end
 
     % ---------- PARAMETERS TO TUNE ----------
@@ -97,12 +103,14 @@ function circlesResults = dropletFindCircle(folder)
         circlesResults(i).metric   = metric;
 
         % quick check plot (optional)
-        figure
-        imshow(img,[]);
-        hold on
-        viscircles(centers, radii, 'EdgeColor','b');
-        title(sprintf('%s  (%d droplets)', imageFiles(i).name, numel(radii)));
-        hold off
+        if showFigures
+            figure
+            imshow(img,[]);
+            hold on
+            viscircles(centers, radii, 'EdgeColor','b');
+            title(sprintf('%s  (%d droplets)', imageFiles(i).name, numel(radii)));
+            hold off
+        end
     end
 
     % save for reuse

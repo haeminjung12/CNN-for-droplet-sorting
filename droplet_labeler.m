@@ -77,8 +77,16 @@ function droplet_labeler(imageDir)
         error('Droplet detection produced no bounding boxes.');
     end
 
+    labelStore = fullfile(imageDir, 'droplet_labels.mat');
+    dropletTable = restore_prior_labels(dropletTable, labelStore);
+
     totalDroplets = height(dropletTable);
-    currentIdx = 1;
+    firstUnlabeled = find(cellfun(@isempty, dropletTable.Label), 1, 'first');
+    if isempty(firstUnlabeled)
+        currentIdx = 1;
+    else
+        currentIdx = firstUnlabeled;
+    end
     ui = build_gui();
     update_display();
 
@@ -224,7 +232,7 @@ function droplet_labeler(imageDir)
 
     function save_and_close()
         csvPath = fullfile(imageDir, 'droplet_labels.csv');
-        matPath = fullfile(imageDir, 'droplet_labels.mat');
+        matPath = labelStore;
         writetable(dropletTable, csvPath);
         save(matPath, 'dropletTable');
         msgbox(sprintf('Saved labels to:\n%s\n%s', csvPath, matPath), 'Saved');
@@ -232,6 +240,44 @@ function droplet_labeler(imageDir)
             close(ui.fig);
         end
     end
+end
+
+function tbl = restore_prior_labels(tbl, labelStore)
+%RESTORE_PRIOR_LABELS Copy labels from an existing droplet_labels.mat if compatible.
+    if ~exist(labelStore, 'file')
+        return;
+    end
+
+    S = load(labelStore);
+    if ~isfield(S, 'dropletTable') || ~istable(S.dropletTable)
+        return;
+    end
+
+    prev = S.dropletTable;
+    needed = {'ImageName','DropletID','Label','ImageIgnored'};
+    if ~all(ismember(needed, prev.Properties.VariableNames))
+        return;
+    end
+
+    % normalize data types to match the freshly built table
+    if isstring(prev.Label)
+        prev.Label = cellstr(prev.Label);
+    elseif iscategorical(prev.Label)
+        prev.Label = cellstr(string(prev.Label));
+    end
+    if isstring(prev.ImageName)
+        prev.ImageName = cellstr(prev.ImageName);
+    end
+
+    prevKey = strcat(string(prev.ImageName), ":", string(prev.DropletID));
+    newKey  = strcat(string(tbl.ImageName),  ":", string(tbl.DropletID));
+    [~, prevIdx, newIdx] = intersect(prevKey, newKey);
+    if isempty(prevIdx)
+        return;
+    end
+
+    tbl.Label(newIdx) = prev.Label(prevIdx);
+    tbl.ImageIgnored(newIdx) = prev.ImageIgnored(prevIdx);
 end
 
 function rect = expand_rect(bbox, imgSize, pad)
