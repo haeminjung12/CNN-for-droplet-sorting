@@ -4,6 +4,8 @@ function droplet_labeler(imageDir)
 %   DROPLET_LABELER starts a GUI that loads all images in a folder, detects
 %   droplets in each image with dropletFindCircle (imfindcircles), crops them,
 %   and lets the user annotate each droplet as "Empty", "Single", or ">2".
+%   Detections are cached per image to circlesResults.mat so you can pause and
+%   resume without reprocessing the whole folder.
 %   Results are saved to a CSV file (droplet_labels.csv) in the selected
 %   folder and to a MAT file so you can resume the session later.
 %
@@ -33,29 +35,37 @@ function droplet_labeler(imageDir)
     end
 
     circlesPath = fullfile(imageDir, 'circlesResults.mat');
+    cachedResults = struct('filename', {}, 'centers', {}, 'radii', {}, 'metric', {});
     if exist(circlesPath, 'file')
         S = load(circlesPath, 'circlesResults');
-        circlesResults = S.circlesResults;
-    else
-        circlesResults = dropletFindCircle(imageDir);
-    end
-    if isempty(circlesResults)
-        error('No droplets detected in %s. Adjust dropletFindCircle parameters and retry.', imageDir);
+        cachedResults = S.circlesResults;
     end
 
-    % Map filenames to detections
-    fileNames = {circlesResults.filename}';
-    uniqueFiles = unique(fileNames, 'stable');
-    images = cell(numel(uniqueFiles), 1);
+    imageFiles = dir(fullfile(imageDir, '*.tif*'));
+    if isempty(imageFiles)
+        error('No .tif/.tiff images found in %s.', imageDir);
+    end
+
+    images = cell(numel(imageFiles), 1);
     dropletTable = table();
-    for k = 1:numel(uniqueFiles)
-        filePath = fullfile(imageDir, uniqueFiles{k});
+    circlesResults = cachedResults;
+
+    for k = 1:numel(imageFiles)
+        filePath = fullfile(imageDir, imageFiles(k).name);
         images{k} = imread(filePath);
 
-        % Find detection record for this file
-        recIdx = find(strcmp(fileNames, uniqueFiles{k}), 1, 'first');
-        centers = circlesResults(recIdx).centers;
-        radii = circlesResults(recIdx).radii;
+        recIdx = find(strcmp({cachedResults.filename}, imageFiles(k).name), 1, 'first');
+        if ~isempty(recIdx)
+            det = cachedResults(recIdx);
+        else
+            det = dropletFindCircle(filePath);
+            circlesResults(end + 1) = det; %#ok<AGROW>
+            cachedResults(end + 1) = det; %#ok<AGROW>
+            save(circlesPath, 'circlesResults');
+        end
+
+        centers = det.centers;
+        radii   = det.radii;
         n = numel(radii);
 
         if n == 0
@@ -66,7 +76,7 @@ function droplet_labeler(imageDir)
         dropletIds = (1:n)';
         dropletTable = [dropletTable; table(repmat(k, n, 1), ...
                                             dropletIds, ...
-                                            repmat({uniqueFiles{k}}, n, 1), ...
+                                            repmat({imageFiles(k).name}, n, 1), ...
                                             bboxes, ...
                                             repmat(false, n, 1), ...
                                             repmat({''}, n, 1), ...
